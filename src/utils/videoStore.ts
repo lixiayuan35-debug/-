@@ -130,6 +130,17 @@ export async function setStoredVideo(key: string, input: Blob | File | string): 
     console.warn('Failed to persist video to IndexedDB:', err);
   }
 
+  // Sync to Firestore Cloud
+  try {
+    import('./cloudSync').then(({ syncVideoToCloud }) => {
+      if (typeof input === 'string') {
+        syncVideoToCloud(key, input).catch(() => {});
+      }
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
+
   return finalUrl;
 }
 

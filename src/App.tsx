@@ -16,6 +16,8 @@ import { Footer } from './components/Footer';
 import { Project } from './types';
 import { PROJECTS_DATA } from './data/portfolioData';
 import { recoverAllStoredImages } from './utils/imageStore';
+import { initRealtimeCloudSync } from './utils/cloudSync';
+import { CloudSyncIndicator } from './components/CloudSyncIndicator';
 
 export default function App() {
   const [isOpeningOpen, setIsOpeningOpen] = useState<boolean>(true);
@@ -24,9 +26,10 @@ export default function App() {
   const [liveProject, setLiveProject] = useState<Project | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
 
-  // Automatically scan and recover all custom images across local/session/indexedDB storages
+  // Automatically scan and recover all custom images and initialize cloud sync with Google Cloud Firestore
   useEffect(() => {
     recoverAllStoredImages();
+    initRealtimeCloudSync();
   }, []);
 
   // Scroll spy to update active navigation item
@@ -127,6 +130,9 @@ export default function App() {
         isOpen={isQrModalOpen}
         onClose={() => setIsQrModalOpen(false)}
       />
+
+      {/* 10. Live Cloud Persistence & Sync Indicator */}
+      <CloudSyncIndicator />
     </div>
   );
 }

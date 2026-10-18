@@ -538,6 +538,15 @@ export function setStoredImage(key: string, dataUrl: string): void {
     .catch((err) => {
       console.warn('Failed to save to IndexedDB:', err);
     });
+
+  // 8. Automatically sync to Firestore cloud storage
+  try {
+    import('./cloudSync').then(({ syncImageToCloud }) => {
+      syncImageToCloud(key, dataUrl).catch(() => {});
+    }).catch(() => {});
+  } catch {
+    // ignore
+  }
 }
 
 /**
