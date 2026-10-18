@@ -1,0 +1,130 @@
+@import "tailwindcss";
+
+@layer base {
+  :root {
+    --canvas: #F5F4F0;
+    --canvas-card: #FFFFFF;
+    --border-subtle: rgba(0, 0, 0, 0.08);
+    --text-primary: #121212;
+    --text-secondary: #6B6A67;
+  }
+
+  body {
+    background-color: var(--canvas);
+    color: var(--text-primary);
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    overflow-x: hidden;
+  }
+}
+
+.font-serif-display {
+  font-family: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+}
+
+.font-sans-body {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+/* Organic Morphing Blob for Personal Profile Avatar */
+@keyframes blobMorph {
+  0% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    transform: rotate(0deg) scale(1);
+  }
+  33% {
+    border-radius: 35% 65% 55% 45% / 55% 45% 65% 35%;
+    transform: rotate(4deg) scale(1.02);
+  }
+  66% {
+    border-radius: 50% 50% 30% 70% / 40% 65% 35% 60%;
+    transform: rotate(-3deg) scale(0.98);
+  }
+  100% {
+    border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%;
+    transform: rotate(0deg) scale(1);
+  }
+}
+
+.animate-blob-organic {
+  animation: blobMorph 10s ease-in-out infinite alternate;
+}
+
+/* Secondary outer halo blob */
+@keyframes blobHalo {
+  0% {
+    border-radius: 50% 50% 60% 40% / 40% 60% 40% 60%;
+    transform: rotate(0deg) scale(1.05);
+  }
+  50% {
+    border-radius: 65% 35% 45% 55% / 60% 40% 55% 45%;
+    transform: rotate(180deg) scale(1.08);
+  }
+  100% {
+    border-radius: 50% 50% 60% 40% / 40% 60% 40% 60%;
+    transform: rotate(360deg) scale(1.05);
+  }
+}
+
+.animate-blob-halo {
+  animation: blobHalo 14s linear infinite;
+}
+
+/* Breathing indicator */
+@keyframes breathingPulse {
+  0%, 100% {
+    opacity: 0.4;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(6px);
+  }
+}
+
+.animate-breathing {
+  animation: breathingPulse 2.4s ease-in-out infinite;
+}
+
+/* Line growth animation */
+@keyframes lineGrow {
+  0% {
+    transform: scaleX(0);
+    opacity: 0;
+  }
+  50% {
+    opacity: 1;
+  }
+  100% {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.animate-line-grow {
+  animation: lineGrow 1.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transform-origin: left center;
+}
+
+/* Smooth horizontal scroll container styling */
+.horizontal-scroll-container {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.horizontal-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+
+/* Glassmorphism utility */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.glass-panel-dark {
+  background: rgba(18, 18, 18, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
