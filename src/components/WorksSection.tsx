@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Project } from '../types';
 import { PROJECTS_DATA } from '../data/portfolioData';
 import { ArtworkVisual } from './ArtworkVisual';
+import { ImageReplaceButton } from './ImageReplaceButton';
 import { getStoredImage, getProjectDisplayImage } from '../utils/imageStore';
 import { ArrowUpRight, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 
@@ -24,48 +25,47 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
 
   const total = PROJECTS_DATA.length;
   const angleStep = 42; // degrees between items
-  // Native wheel and touch gesture handling:
-  // Strictly prevent outer page scrolling while user scrolls/swipes within this carousel
+  const dragDistanceRef = useRef<number>(0);
+
+  // Wheel & Touch swipe handling: non-passive listener prevents outer page from scrolling
   useEffect(() => {
     const container = carouselContainerRef.current;
     if (!container) return;
 
-    // Wheel handling with { passive: false } so e.preventDefault() reliably halts outer page scroll
-    const handleNativeWheel = (e: WheelEvent) => {
+    // 1. Non-passive wheel listener: guarantees outer page will NOT scroll
+    const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       e.stopPropagation();
 
-      const deltaY = e.deltaY;
-      const deltaX = e.deltaX;
-      const effectiveDelta = Math.abs(deltaY) >= Math.abs(deltaX) ? deltaY : deltaX;
+      const delta = Math.abs(e.deltaY) >= Math.abs(e.deltaX) ? e.deltaY : e.deltaX;
+      if (Math.abs(delta) < 1) return;
 
-      if (Math.abs(effectiveDelta) > 2) {
-        const delta = effectiveDelta > 0 ? -14 : 14;
-        setRotationAngle((prev) => {
-          const nextAngle = prev + delta;
-          const normalized = ((-nextAngle / angleStep) % total + total) % total;
-          setActiveIndex(Math.round(normalized) % total);
-          return nextAngle;
-        });
-      }
+      const angleDelta = delta > 0 ? -10 : 10;
+      setRotationAngle((prev) => {
+        const nextAngle = prev + angleDelta;
+        const normalized = ((-nextAngle / angleStep) % total + total) % total;
+        setActiveIndex(Math.round(normalized) % total);
+        return nextAngle;
+      });
     };
 
-    // Touch gesture handling: swipe vertically or horizontally to rotate without moving outer page
+    // 2. Touch listeners: prevents outer page vertical/horizontal scrolling on swipe
     let touchStartY = 0;
     let touchStartX = 0;
     let isTouching = false;
 
-    const handleTouchStart = (e: TouchEvent) => {
-      if (e.touches.length > 0) {
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
         isTouching = true;
         touchStartY = e.touches[0].clientY;
         touchStartX = e.touches[0].clientX;
+        dragDistanceRef.current = 0;
       }
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
-      if (!isTouching || e.touches.length === 0) return;
-      // Strictly prevent outer page from scrolling when swiping inside this element
+    const onTouchMove = (e: TouchEvent) => {
+      if (!isTouching || e.touches.length !== 1) return;
+      // Prevent outside page scroll
       e.preventDefault();
       e.stopPropagation();
 
@@ -73,11 +73,14 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
       const currentX = e.touches[0].clientX;
       const diffY = currentY - touchStartY;
       const diffX = currentX - touchStartX;
+      const diff = Math.abs(diffY) > Math.abs(diffX) ? diffY : diffX;
 
-      if (Math.abs(diffY) > 5 || Math.abs(diffX) > 5) {
-        const delta = (Math.abs(diffY) >= Math.abs(diffX) ? diffY : diffX) > 0 ? 10 : -10;
+      dragDistanceRef.current += Math.abs(diff);
+
+      if (Math.abs(diff) > 2) {
+        const step = diff * 0.45;
         setRotationAngle((prev) => {
-          const nextAngle = prev + delta;
+          const nextAngle = prev + step;
           const normalized = ((-nextAngle / angleStep) % total + total) % total;
           setActiveIndex(Math.round(normalized) % total);
           return nextAngle;
@@ -87,64 +90,81 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
       }
     };
 
-    const handleTouchEnd = () => {
+    const onTouchEnd = () => {
       isTouching = false;
     };
 
-    // Mouse drag gesture handling
-    let isMouseDown = false;
-    let mouseStartY = 0;
-    let mouseStartX = 0;
+    // 3. Pointer drag support (mouse slide/drag)
+    let isDragging = false;
+    let dragStartY = 0;
+    let dragStartX = 0;
 
-    const handleMouseDown = (e: MouseEvent) => {
-      if ((e.target as HTMLElement)?.closest('button, a')) return;
-      isMouseDown = true;
-      mouseStartY = e.clientY;
-      mouseStartX = e.clientX;
+    const onPointerDown = (e: PointerEvent) => {
+      // Don't drag if clicking buttons
+      const target = e.target as HTMLElement;
+      if (target.closest('button')) return;
+      isDragging = true;
+      dragStartY = e.clientY;
+      dragStartX = e.clientX;
+      dragDistanceRef.current = 0;
+      try {
+        container.setPointerCapture?.(e.pointerId);
+      } catch {}
     };
 
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isMouseDown) return;
+    const onPointerMove = (e: PointerEvent) => {
+      if (!isDragging) return;
       e.preventDefault();
       e.stopPropagation();
 
-      const diffY = e.clientY - mouseStartY;
-      const diffX = e.clientX - mouseStartX;
+      const diffY = e.clientY - dragStartY;
+      const diffX = e.clientX - dragStartX;
+      const diff = Math.abs(diffY) > Math.abs(diffX) ? diffY : diffX;
 
-      if (Math.abs(diffY) > 6 || Math.abs(diffX) > 6) {
-        const delta = (Math.abs(diffY) >= Math.abs(diffX) ? diffY : diffX) > 0 ? 10 : -10;
+      dragDistanceRef.current += Math.abs(diff);
+
+      if (Math.abs(diff) > 1.5) {
+        const step = diff * 0.45;
         setRotationAngle((prev) => {
-          const nextAngle = prev + delta;
+          const nextAngle = prev + step;
           const normalized = ((-nextAngle / angleStep) % total + total) % total;
           setActiveIndex(Math.round(normalized) % total);
           return nextAngle;
         });
-        mouseStartY = e.clientY;
-        mouseStartX = e.clientX;
+        dragStartY = e.clientY;
+        dragStartX = e.clientX;
       }
     };
 
-    const handleMouseUp = () => {
-      isMouseDown = false;
+    const onPointerUp = (e: PointerEvent) => {
+      if (isDragging) {
+        isDragging = false;
+        try {
+          container.releasePointerCapture?.(e.pointerId);
+        } catch {}
+      }
     };
 
-    // Attach non-passive wheel and touch listeners
-    container.addEventListener('wheel', handleNativeWheel, { passive: false });
-    container.addEventListener('touchstart', handleTouchStart, { passive: true });
-    container.addEventListener('touchmove', handleTouchMove, { passive: false });
-    container.addEventListener('touchend', handleTouchEnd);
-    container.addEventListener('mousedown', handleMouseDown);
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
+    container.addEventListener('wheel', onWheel, { passive: false });
+    container.addEventListener('touchstart', onTouchStart, { passive: true });
+    container.addEventListener('touchmove', onTouchMove, { passive: false });
+    container.addEventListener('touchend', onTouchEnd, { passive: true });
+    container.addEventListener('touchcancel', onTouchEnd, { passive: true });
+    container.addEventListener('pointerdown', onPointerDown);
+    container.addEventListener('pointermove', onPointerMove);
+    container.addEventListener('pointerup', onPointerUp);
+    container.addEventListener('pointercancel', onPointerUp);
 
     return () => {
-      container.removeEventListener('wheel', handleNativeWheel);
-      container.removeEventListener('touchstart', handleTouchStart);
-      container.removeEventListener('touchmove', handleTouchMove);
-      container.removeEventListener('touchend', handleTouchEnd);
-      container.removeEventListener('mousedown', handleMouseDown);
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
+      container.removeEventListener('wheel', onWheel);
+      container.removeEventListener('touchstart', onTouchStart);
+      container.removeEventListener('touchmove', onTouchMove);
+      container.removeEventListener('touchend', onTouchEnd);
+      container.removeEventListener('touchcancel', onTouchEnd);
+      container.removeEventListener('pointerdown', onPointerDown);
+      container.removeEventListener('pointermove', onPointerMove);
+      container.removeEventListener('pointerup', onPointerUp);
+      container.removeEventListener('pointercancel', onPointerUp);
     };
   }, [total, angleStep]);
 
@@ -200,8 +220,9 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
           {/* Left Column: Semi-Circular Carousel Showcase Area */}
           <div
             ref={carouselContainerRef}
-            className="lg:col-span-7 relative h-[640px] sm:h-[680px] w-full overflow-hidden border border-neutral-300/80 bg-[#EFECE6]/50 select-none shadow-inner overscroll-contain touch-none cursor-grab active:cursor-grabbing"
-            title="在此区域滑动滚轮或拖拽以旋转作品摩天轮（已锁定外层页面不跟随滚动）"
+            className="lg:col-span-7 relative h-[640px] sm:h-[680px] w-full overflow-hidden border border-neutral-300/80 bg-[#EFECE6]/50 select-none shadow-inner touch-none overscroll-contain cursor-grab active:cursor-grabbing"
+            style={{ touchAction: 'none', overscrollBehavior: 'contain' }}
+            title="在此区域滑动或滚动鼠标滚轮以旋转作品摩天轮（外层页面不会滚动）"
           >
             {/* Background Circular Orbit Guide Rails */}
             <div
@@ -263,9 +284,9 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
             </div>
 
             {/* Hint overlay on bottom left */}
-            <div className="absolute bottom-4 left-4 z-20 text-[10px] font-mono tracking-widest text-neutral-500 flex items-center gap-2 bg-[#F5F4F0]/80 px-2 py-1 border border-neutral-200">
+            <div className="absolute bottom-4 left-4 z-20 text-[10px] font-mono tracking-widest text-neutral-500 flex items-center gap-2 bg-[#F5F4F0]/80 px-2 py-1 border border-neutral-200 pointer-events-none select-none">
               <span className="w-1.5 h-1.5 rounded-full bg-neutral-800 animate-pulse" />
-              <span>滚动鼠标滚轮沿圆周旋转 (ORBIT WHEEL)</span>
+              <span>滑动 / 滚轮旋转 · 页面锁定 (ORBIT WHEEL)</span>
             </div>
 
             {/* Cards Orbiting on the Circle */}
@@ -292,6 +313,7 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                 <div
                   key={project.id}
                   onClick={() => {
+                    if (dragDistanceRef.current > 8) return;
                     rotateToIndex(idx);
                     onSelectProject(project);
                   }}
@@ -339,7 +361,15 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                         </span>
                       </div>
 
-
+                      {/* Replace Photo Button (Camera Icon) on card */}
+                      <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
+                        <ImageReplaceButton
+                          imageKey={`project-${project.id}`}
+                          title={`更换《${project.title}》封面照片`}
+                          size="icon"
+                          variant="dark"
+                        />
+                      </div>
                     </div>
 
                     {/* Connecting Line and Name on the RIGHT of the card */}
@@ -392,11 +422,21 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                 </span>
               </div>
 
-              {/* Title & Tagline */}
+              {/* Title & Tagline & Direct Photo Replacement Button */}
               <div>
-                <h3 className="text-3xl sm:text-4xl font-serif-display font-normal text-neutral-950 tracking-tight leading-tight">
-                  {activeProject.title}
-                </h3>
+                <div className="flex items-start justify-between gap-4">
+                  <h3 className="text-3xl sm:text-4xl font-serif-display font-normal text-neutral-950 tracking-tight leading-tight">
+                    {activeProject.title}
+                  </h3>
+                  <ImageReplaceButton
+                    imageKey={`project-${activeProject.id}`}
+                    title={`更换《${activeProject.title}》封面照片`}
+                    label="更换照片"
+                    size="sm"
+                    variant="light"
+                    className="shrink-0 mt-1"
+                  />
+                </div>
                 <p className="text-xs font-mono tracking-widest text-neutral-500 uppercase mt-1">
                   {activeProject.englishTitle}
                 </p>
@@ -409,7 +449,7 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                   )}
               </div>
 
-              {/* Visual Preview Snapshot with Natural Aspect Ratio */}
+              {/* Visual Preview Snapshot with One-Click Replace and Natural Aspect Ratio */}
               <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-56 bg-neutral-200 border border-neutral-300 overflow-hidden group shadow-xs">
                 <ArtworkVisual
                   key={`preview-visual-${activeProject.id}-${imagesVersion}`}
@@ -421,6 +461,18 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                   className="w-full h-full object-cover"
                   clearBaseVisual={true}
                 />
+                <div className="absolute inset-0 bg-neutral-950/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                  <ImageReplaceButton
+                    imageKey={`project-${activeProject.id}`}
+                    title={`更换《${activeProject.title}》封面照片`}
+                    label="点击更换此作品照片"
+                    size="md"
+                    variant="dark"
+                  />
+                </div>
+                <div className="absolute bottom-1.5 left-2 bg-neutral-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 tracking-wider backdrop-blur-xs">
+                  作品主图 · 可替换
+                </div>
               </div>
 
               {/* Chinese Introduction & Design Concept */}
