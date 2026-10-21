@@ -7,6 +7,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { toRootRelativePath } from './pathUtils';
 
 const EVENT_NAME = 'portfolio_custom_video_updated';
 const IDB_NAME = 'portfolio_video_storage';
@@ -79,9 +80,10 @@ if (typeof window !== 'undefined') {
  */
 export function getStoredVideo(key: string, fallback?: string): string | null {
   if (videoCache.has(key)) {
-    return videoCache.get(key) || null;
+    const cached = videoCache.get(key) || null;
+    return toRootRelativePath(cached) || cached;
   }
-  return fallback || null;
+  return toRootRelativePath(fallback) || fallback || null;
 }
 
 /**
@@ -108,7 +110,7 @@ export async function setStoredVideo(key: string, input: Blob | File | string): 
   let finalUrl: string;
 
   if (typeof input === 'string') {
-    finalUrl = input;
+    finalUrl = toRootRelativePath(input) || input;
     rawBlobs.delete(key);
   } else {
     rawBlobs.set(key, input);
@@ -128,17 +130,6 @@ export async function setStoredVideo(key: string, input: Blob | File | string): 
     store.put(input, key);
   } catch (err) {
     console.warn('Failed to persist video to IndexedDB:', err);
-  }
-
-  // Sync to Firestore Cloud
-  try {
-    import('./cloudSync').then(({ syncVideoToCloud }) => {
-      if (typeof input === 'string') {
-        syncVideoToCloud(key, input).catch(() => {});
-      }
-    }).catch(() => {});
-  } catch {
-    // ignore
   }
 
   return finalUrl;

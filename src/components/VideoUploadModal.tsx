@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Video, Upload, Link as LinkIcon, Trash2, X, Check, Film, AlertCircle, Play } from 'lucide-react';
 import { useStoredVideo } from '../utils/videoStore';
+import { toRootRelativePath } from '../utils/pathUtils';
 
 interface VideoUploadModalProps {
   videoKey: string;
@@ -81,13 +82,16 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
 
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!urlInput.trim()) return;
+    const raw = urlInput.trim();
+    if (!raw) return;
+
+    const normalizedUrl = toRootRelativePath(raw) || raw;
 
     try {
       setIsProcessing(true);
       setErrorMsg(null);
-      await setVideo(urlInput.trim());
-      setSuccessMsg('在线视频已成功载入！');
+      await setVideo(normalizedUrl);
+      setSuccessMsg('视频已成功载入！');
       setUrlInput('');
       setTimeout(() => {
         setSuccessMsg(null);
@@ -95,7 +99,7 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
       }, 700);
     } catch (err) {
       console.error(err);
-      setErrorMsg('保存视频链接失败，请确认链接可直接访问。');
+      setErrorMsg('保存视频路径失败，请确认文件路径或链接可直接访问。');
     } finally {
       setIsProcessing(false);
     }
@@ -282,24 +286,27 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
             <form onSubmit={handleUrlSubmit} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[11px] font-mono text-neutral-500 block">
-                  在线视频直接播放链接 (Direct MP4 / WebM / CDN URL)
+                  输入相对网站根路径或在线视频直接链接 (如 /videos/xxx.mp4 或 CDN URL)
                 </label>
                 <div className="relative">
                   <input
-                    type="url"
+                    type="text"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="https://.../space-walkthrough.mp4"
+                    placeholder="/videos/space-walkthrough.mp4 或 https://..."
                     className="w-full px-3 py-2 text-xs font-mono bg-white border border-neutral-300 focus:outline-none focus:border-neutral-900 transition-colors pr-8"
                   />
                   <LinkIcon className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-2.5 pointer-events-none" />
                 </div>
+                <p className="text-[10px] text-neutral-400 font-mono">
+                  支持相对网站根路径（如 /videos/...，文件放入 public 目录即可全网可见）
+                </p>
               </div>
 
               {urlInput.trim() && (
                 <div className="aspect-video bg-black overflow-hidden border border-neutral-300">
                   <video
-                    src={urlInput.trim()}
+                    src={toRootRelativePath(urlInput.trim()) || urlInput.trim()}
                     controls
                     className="w-full h-full object-contain"
                   />

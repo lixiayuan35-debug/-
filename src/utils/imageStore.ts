@@ -14,6 +14,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { toRootRelativePath } from './pathUtils';
 
 const STORAGE_PREFIX = 'portfolio_img_';
 const INDEX_KEY = 'portfolio_img_keys';
@@ -150,25 +151,26 @@ export function recoverAllStoredImages(): number {
 
   const registerImage = (key: string, dataUrl: string) => {
     if (!key || typeof dataUrl !== 'string' || !dataUrl.trim()) return;
+    const cleanUrl = toRootRelativePath(dataUrl) || dataUrl;
     if (!memoryCache.has(key)) {
-      memoryCache.set(key, dataUrl);
+      memoryCache.set(key, cleanUrl);
       recoveredCount++;
     }
     // Also populate aliases
     getKeyAliases(key).forEach((alias) => {
       if (!memoryCache.has(alias)) {
-        memoryCache.set(alias, dataUrl);
+        memoryCache.set(alias, cleanUrl);
       }
     });
 
     // Save into isolated per-key localStorage for safety
     try {
-      localStorage.setItem(STORAGE_PREFIX + key, dataUrl);
+      localStorage.setItem(STORAGE_PREFIX + key, cleanUrl);
     } catch {
       // ignore
     }
     try {
-      sessionStorage.setItem(STORAGE_PREFIX + key, dataUrl);
+      sessionStorage.setItem(STORAGE_PREFIX + key, cleanUrl);
     } catch {
       // ignore
     }
@@ -227,7 +229,7 @@ export function recoverAllStoredImages(): number {
       if (k) {
         if (k.startsWith('project-') || k.startsWith('card-') || k.startsWith('hero-') || k.startsWith('persona_')) {
           const val = localStorage.getItem(k);
-          if (val && (val.startsWith('data:image/') || val.startsWith('http://') || val.startsWith('https://'))) {
+          if (val && (val.startsWith('data:image/') || val.startsWith('http://') || val.startsWith('https://') || val.startsWith('/') || val.startsWith('./') || /^[a-zA-Z]:/.test(val))) {
             registerImage(k, val);
           }
         }
@@ -240,7 +242,7 @@ export function recoverAllStoredImages(): number {
               if (Array.isArray(cards)) {
                 cards.forEach((card) => {
                   if (card && card.id && card.imageUrl && typeof card.imageUrl === 'string') {
-                    if (card.imageUrl.startsWith('data:image/') || card.imageUrl.startsWith('http')) {
+                    if (card.imageUrl.startsWith('data:image/') || card.imageUrl.startsWith('http') || card.imageUrl.startsWith('/') || card.imageUrl.startsWith('./') || /^[a-zA-Z]:/.test(card.imageUrl)) {
                       registerImage(`card-${card.id}`, card.imageUrl);
                     }
                   }
@@ -363,14 +365,16 @@ export function getStoredImage(key: string, fallback?: string): string | null {
     try {
       const direct = localStorage.getItem(STORAGE_PREFIX + k);
       if (direct) {
-        memoryCache.set(key, direct);
-        memoryCache.set(k, direct);
-        return direct;
+        const norm = toRootRelativePath(direct) || direct;
+        memoryCache.set(key, norm);
+        memoryCache.set(k, norm);
+        return norm;
       }
       const rawDirect = localStorage.getItem(k);
-      if (rawDirect && (rawDirect.startsWith('data:') || rawDirect.startsWith('http'))) {
-        memoryCache.set(key, rawDirect);
-        return rawDirect;
+      if (rawDirect && (rawDirect.startsWith('data:') || rawDirect.startsWith('http') || rawDirect.startsWith('/') || rawDirect.startsWith('./') || /^[a-zA-Z]:/.test(rawDirect))) {
+        const norm = toRootRelativePath(rawDirect) || rawDirect;
+        memoryCache.set(key, norm);
+        return norm;
       }
     } catch {
       // ignore
@@ -384,9 +388,10 @@ export function getStoredImage(key: string, fallback?: string): string | null {
       const parsed = JSON.parse(raw);
       for (const k of aliases) {
         if (parsed[k]) {
-          memoryCache.set(key, parsed[k]);
-          memoryCache.set(k, parsed[k]);
-          return parsed[k];
+          const norm = toRootRelativePath(parsed[k]) || parsed[k];
+          memoryCache.set(key, norm);
+          memoryCache.set(k, norm);
+          return norm;
         }
       }
     }
@@ -399,15 +404,16 @@ export function getStoredImage(key: string, fallback?: string): string | null {
     try {
       const sessionVal = sessionStorage.getItem(STORAGE_PREFIX + k);
       if (sessionVal) {
-        memoryCache.set(key, sessionVal);
-        return sessionVal;
+        const norm = toRootRelativePath(sessionVal) || sessionVal;
+        memoryCache.set(key, norm);
+        return norm;
       }
     } catch {
       // ignore
     }
   }
 
-  return fallback || null;
+  return toRootRelativePath(fallback) || fallback || null;
 }
 
 /**
@@ -488,22 +494,23 @@ export function cleanupStorageQuota(): void {
  * Save image with guaranteed multi-layer persistence (Memory, Isolated LocalStorage, SessionStorage, IndexedDB)
  */
 export function setStoredImage(key: string, dataUrl: string): void {
+  const normalized = toRootRelativePath(dataUrl) || dataUrl;
   const aliases = getKeyAliases(key);
 
   // 1. Immediately update memory cache for key and aliases (instant synchronous render)
-  aliases.forEach((k) => memoryCache.set(k, dataUrl));
+  aliases.forEach((k) => memoryCache.set(k, normalized));
 
   // 2. Dispatch event to update all reactive components immediately
-  window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { key, dataUrl } }));
+  window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { key, dataUrl: normalized } }));
 
   // 3. Save into isolated per-key localStorage (CRITICAL: prevents wiping other images on quota boundaries!)
   try {
-    localStorage.setItem(STORAGE_PREFIX + key, dataUrl);
+    localStorage.setItem(STORAGE_PREFIX + key, normalized);
   } catch (err) {
     // Quota exceeded: run cleanup and retry
     cleanupStorageQuota();
     try {
-      localStorage.setItem(STORAGE_PREFIX + key, dataUrl);
+      localStorage.setItem(STORAGE_PREFIX + key, normalized);
     } catch (retryErr) {
       console.warn(`localStorage full, safely saved to memoryCache, sessionStorage & IndexedDB:`, retryErr);
     }
@@ -511,7 +518,7 @@ export function setStoredImage(key: string, dataUrl: string): void {
 
   // 4. SessionStorage backup (independent tab quota)
   try {
-    sessionStorage.setItem(STORAGE_PREFIX + key, dataUrl);
+    sessionStorage.setItem(STORAGE_PREFIX + key, normalized);
   } catch {
     // ignore
   }
@@ -533,20 +540,11 @@ export function setStoredImage(key: string, dataUrl: string): void {
     .then((db) => {
       const tx = db.transaction(IDB_STORE, 'readwrite');
       const store = tx.objectStore(IDB_STORE);
-      store.put(dataUrl, key);
+      store.put(normalized, key);
     })
     .catch((err) => {
       console.warn('Failed to save to IndexedDB:', err);
     });
-
-  // 8. Automatically sync to Firestore cloud storage
-  try {
-    import('./cloudSync').then(({ syncImageToCloud }) => {
-      syncImageToCloud(key, dataUrl).catch(() => {});
-    }).catch(() => {});
-  } catch {
-    // ignore
-  }
 }
 
 /**

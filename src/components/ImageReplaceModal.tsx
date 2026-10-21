@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { Camera, Upload, Link as LinkIcon, Trash2, X, Check, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { useStoredImage, compressImageFileWithMeta } from '../utils/imageStore';
+import { toRootRelativePath } from '../utils/pathUtils';
 
 interface ImageReplaceModalProps {
   imageKey: string;
@@ -72,19 +73,21 @@ export const ImageReplaceModal: React.FC<ImageReplaceModalProps> = ({
 
   const handleUrlSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const url = urlInput.trim();
-    if (!url) return;
+    const raw = urlInput.trim();
+    if (!raw) return;
+
+    const normalizedUrl = toRootRelativePath(raw) || raw;
 
     try {
       setIsProcessing(true);
       setErrorMsg(null);
-      await setImage(url);
+      await setImage(normalizedUrl);
       const img = new Image();
       img.onload = () => {
-        onImageUploaded?.(url, img.naturalWidth || 800, img.naturalHeight || 600);
+        onImageUploaded?.(normalizedUrl, img.naturalWidth || 800, img.naturalHeight || 600);
       };
-      img.src = url;
-      setSuccessMsg('网络图片链接已成功应用！');
+      img.src = normalizedUrl;
+      setSuccessMsg('图片已成功应用！');
       setUrlInput('');
       setTimeout(() => {
         setSuccessMsg(null);
@@ -92,7 +95,7 @@ export const ImageReplaceModal: React.FC<ImageReplaceModalProps> = ({
       }, 900);
     } catch (err) {
       console.error(err);
-      setErrorMsg('保存图片链接失败，请确认链接可直接访问。');
+      setErrorMsg('保存图片路径失败，请确认文件路径或链接可直接访问。');
     } finally {
       setIsProcessing(false);
     }
@@ -231,19 +234,22 @@ export const ImageReplaceModal: React.FC<ImageReplaceModalProps> = ({
             <form onSubmit={handleUrlSubmit} className="space-y-3">
               <div className="space-y-1.5">
                 <label className="text-xs font-mono text-neutral-600 block">
-                  粘贴图片网络 URL：
+                  输入相对网站根路径或网络图片 URL：
                 </label>
                 <div className="flex items-center gap-2 border border-neutral-300 bg-white px-3 py-2 focus-within:border-neutral-900">
                   <LinkIcon className="w-4 h-4 text-neutral-400 shrink-0" />
                   <input
-                    type="url"
-                    placeholder="https://images.unsplash.com/..."
+                    type="text"
+                    placeholder="/works/the-cubo/cover.jpg 或 https://..."
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
                     className="w-full text-xs font-mono outline-none text-neutral-800 bg-transparent"
                     required
                   />
                 </div>
+                <p className="text-[10px] text-neutral-400 font-mono">
+                  支持相对网站根路径（如 /works/...，文件放入 public 目录即可全网可见）
+                </p>
               </div>
               <button
                 type="submit"

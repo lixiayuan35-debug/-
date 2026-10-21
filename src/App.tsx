@@ -12,12 +12,11 @@ import { ProjectQuickModal } from './components/ProjectQuickModal';
 import { ProjectDetailPage } from './components/ProjectDetailPage';
 import { OpeningAnimation } from './components/OpeningAnimation';
 import { ContactQrModal } from './components/ContactQrModal';
+import { DataBackupModal } from './components/DataBackupModal';
 import { Footer } from './components/Footer';
 import { Project } from './types';
 import { PROJECTS_DATA } from './data/portfolioData';
 import { recoverAllStoredImages } from './utils/imageStore';
-import { initRealtimeCloudSync } from './utils/cloudSync';
-import { CloudSyncIndicator } from './components/CloudSyncIndicator';
 
 export default function App() {
   const [isOpeningOpen, setIsOpeningOpen] = useState<boolean>(true);
@@ -25,11 +24,11 @@ export default function App() {
   const [modalProject, setModalProject] = useState<Project | null>(null);
   const [liveProject, setLiveProject] = useState<Project | null>(null);
   const [isQrModalOpen, setIsQrModalOpen] = useState<boolean>(false);
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState<boolean>(false);
 
-  // Automatically scan and recover all custom images and initialize cloud sync with Google Cloud Firestore
+  // Automatically scan and recover all custom images across local/session/indexedDB storages
   useEffect(() => {
     recoverAllStoredImages();
-    initRealtimeCloudSync();
   }, []);
 
   // Scroll spy to update active navigation item
@@ -88,6 +87,7 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={handleNavigate}
         onOpenQrModal={() => setIsQrModalOpen(true)}
+        onOpenBackupModal={() => setIsBackupModalOpen(true)}
       />
 
       {/* Main Content View */}
@@ -103,7 +103,10 @@ export default function App() {
       </main>
 
       {/* 6. Footer */}
-      <Footer onBackToTop={handleBackToTop} />
+      <Footer
+        onBackToTop={handleBackToTop}
+        onOpenBackupModal={() => setIsBackupModalOpen(true)}
+      />
 
       {/* 7. Fullscreen Quick Preview Modal */}
       <ProjectQuickModal
@@ -131,8 +134,11 @@ export default function App() {
         onClose={() => setIsQrModalOpen(false)}
       />
 
-      {/* 10. Live Cloud Persistence & Sync Indicator */}
-      <CloudSyncIndicator />
+      {/* 10. Data Backup & Solidification Modal */}
+      <DataBackupModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+      />
     </div>
   );
 }

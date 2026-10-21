@@ -2,6 +2,7 @@ import React, { useRef, useState, useEffect } from 'react';
 import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, X, Film, Trash2, Video, Plus, Ratio } from 'lucide-react';
 import { StaggeredCard } from '../types';
 import { useStoredVideo } from '../utils/videoStore';
+import { toRootRelativePath } from '../utils/pathUtils';
 import { VideoReplaceButton } from './VideoReplaceButton';
 import { VideoUploadModal } from './VideoUploadModal';
 import { CardRatioModal } from './CardRatioModal';
@@ -219,7 +220,7 @@ export const VideoBlock: React.FC<VideoBlockProps> = ({
             <>
               <video
                 ref={videoRef}
-                src={videoUrl}
+                src={toRootRelativePath(videoUrl) || videoUrl}
                 loop
                 muted={isMuted}
                 playsInline

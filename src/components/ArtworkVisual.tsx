@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { toRootRelativePath } from '../utils/pathUtils';
 
 interface ArtworkVisualProps {
   type: string;
@@ -20,15 +21,20 @@ export const ArtworkVisual: React.FC<ArtworkVisualProps> = ({
   clearBaseVisual = false,
   fitMode = 'cover',
 }) => {
-  const displayImage =
+  const rawImage =
     imageUrl ||
     (type &&
     (type.startsWith('data:') ||
       type.startsWith('http://') ||
       type.startsWith('https://') ||
-      type.startsWith('/'))
+      type.startsWith('/') ||
+      type.startsWith('./') ||
+      type.includes('/works/') ||
+      /^[a-zA-Z]:/.test(type))
       ? type
       : null);
+
+  const displayImage = toRootRelativePath(rawImage) || rawImage;
 
   const [loadFailed, setLoadFailed] = useState<boolean>(false);
   const [prevImage, setPrevImage] = useState<string | null>(displayImage);

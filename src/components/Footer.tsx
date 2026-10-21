@@ -1,11 +1,12 @@
 import React from 'react';
-import { ArrowUp, Mail, Phone } from 'lucide-react';
+import { ArrowUp, Mail, Phone, Database } from 'lucide-react';
 
 interface FooterProps {
   onBackToTop: () => void;
+  onOpenBackupModal?: () => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onBackToTop }) => {
+export const Footer: React.FC<FooterProps> = ({ onBackToTop, onOpenBackupModal }) => {
   return (
     <footer className="w-full bg-[#141414] text-[#EDEDED] py-20 px-6 sm:px-12 select-none border-t border-neutral-800">
       <div className="max-w-7xl mx-auto flex flex-col justify-between space-y-16">
@@ -65,8 +66,19 @@ export const Footer: React.FC<FooterProps> = ({ onBackToTop }) => {
             </a>
           </div>
 
-          <div className="text-neutral-500 text-xs tracking-wider">
-            LI XIAYUAN · ALL RIGHTS RESERVED
+          <div className="flex items-center gap-4 text-neutral-500 text-xs tracking-wider">
+            {onOpenBackupModal && (
+              <button
+                onClick={onOpenBackupModal}
+                className="text-neutral-400 hover:text-white underline underline-offset-4 decoration-neutral-700 hover:decoration-white transition-colors cursor-pointer flex items-center gap-1.5"
+                title="导出或备份当前在浏览器中上传的作品数据"
+              >
+                <Database className="w-3.5 h-3.5 text-neutral-400" />
+                <span>数据备份与固化</span>
+              </button>
+            )}
+            <span>·</span>
+            <span>LI XIAYUAN · ALL RIGHTS RESERVED</span>
           </div>
         </div>
       </div>
