@@ -27,8 +27,72 @@ export default function App() {
   const [isBackupModalOpen, setIsBackupModalOpen] = useState<boolean>(false);
 
   // Automatically scan and recover all custom images across local/session/indexedDB storages
+  // and immediately auto-persist any valid links to codebase files
   useEffect(() => {
     recoverAllStoredImages();
+
+    try {
+      const images: Record<string, string> = {};
+      const videos: Record<string, string> = {};
+      const layouts: Record<string, any> = {};
+      const ratios: Record<string, any> = {};
+      const deletedCards: Record<string, any> = {};
+
+      for (let i = 0; i < localStorage.length; i++) {
+        const k = localStorage.key(i);
+        if (!k) continue;
+        const val = localStorage.getItem(k);
+        if (!val) continue;
+
+        if (
+          k.startsWith('portfolio_img_') ||
+          k.startsWith('card-') ||
+          k.startsWith('project-') ||
+          k.startsWith('hero-') ||
+          k.startsWith('persona_') ||
+          k.startsWith('contact_qr_')
+        ) {
+          if (!val.startsWith('data:') && !val.startsWith('blob:') && (val.startsWith('http') || val.startsWith('/'))) {
+            const cleanKey = k.startsWith('portfolio_img_') ? k.replace('portfolio_img_', '') : k;
+            images[cleanKey] = val;
+          }
+        } else if (k.startsWith('card-video-')) {
+          if (!val.startsWith('blob:') && !val.startsWith('data:')) {
+            videos[k] = val;
+          }
+        } else if (k.startsWith('project_cards_')) {
+          try {
+            layouts[k] = JSON.parse(val);
+          } catch {}
+        } else if (k.startsWith('card_ratio_')) {
+          try {
+            ratios[k] = JSON.parse(val);
+          } catch {}
+        } else if (k.startsWith('project_deleted_cards_')) {
+          try {
+            deletedCards[k] = JSON.parse(val);
+          } catch {}
+        }
+      }
+
+      if (Object.keys(images).length > 0 || Object.keys(videos).length > 0 || Object.keys(layouts).length > 0) {
+        fetch('/api/save-portfolio-data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            version: '1.0',
+            exportedAt: new Date().toISOString(),
+            images,
+            videos,
+            layouts,
+            ratios,
+            deletedCards,
+          }),
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Auto sync error:', e);
+    }
   }, []);
 
   // Scroll spy to update active navigation item
@@ -87,7 +151,6 @@ export default function App() {
         activeSection={activeSection}
         onNavigate={handleNavigate}
         onOpenQrModal={() => setIsQrModalOpen(true)}
-        onOpenBackupModal={() => setIsBackupModalOpen(true)}
       />
 
       {/* Main Content View */}
@@ -105,7 +168,6 @@ export default function App() {
       {/* 6. Footer */}
       <Footer
         onBackToTop={handleBackToTop}
-        onOpenBackupModal={() => setIsBackupModalOpen(true)}
       />
 
       {/* 7. Fullscreen Quick Preview Modal */}

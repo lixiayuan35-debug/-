@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { Video, Upload, Link as LinkIcon, Trash2, X, Check, Film, AlertCircle, Play } from 'lucide-react';
 import { useStoredVideo } from '../utils/videoStore';
 import { toRootRelativePath } from '../utils/pathUtils';
+import { analyzeVideoSource } from '../utils/videoUtils';
 
 interface VideoUploadModalProps {
   videoKey: string;
@@ -85,13 +86,14 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
     const raw = urlInput.trim();
     if (!raw) return;
 
-    const normalizedUrl = toRootRelativePath(raw) || raw;
+    const sourceInfo = analyzeVideoSource(raw);
+    const finalUrl = sourceInfo?.embedUrl || toRootRelativePath(raw) || raw;
 
     try {
       setIsProcessing(true);
       setErrorMsg(null);
-      await setVideo(normalizedUrl);
-      setSuccessMsg('视频已成功载入！');
+      await setVideo(finalUrl);
+      setSuccessMsg(sourceInfo?.type === 'bilibili' ? 'Bilibili 视频已成功载入！' : '视频已成功载入！');
       setUrlInput('');
       setTimeout(() => {
         setSuccessMsg(null);
@@ -285,33 +287,72 @@ export const VideoUploadModal: React.FC<VideoUploadModalProps> = ({
           ) : (
             <form onSubmit={handleUrlSubmit} className="space-y-4">
               <div className="space-y-1.5">
-                <label className="text-[11px] font-mono text-neutral-500 block">
-                  输入相对网站根路径或在线视频直接链接 (如 /videos/xxx.mp4 或 CDN URL)
+                <label className="text-[11px] font-mono text-neutral-600 block">
+                  粘贴 Bilibili 视频链接、在线直链或相对网站根路径：
                 </label>
                 <div className="relative">
                   <input
                     type="text"
                     value={urlInput}
                     onChange={(e) => setUrlInput(e.target.value)}
-                    placeholder="/videos/space-walkthrough.mp4 或 https://..."
+                    placeholder="https://www.bilibili.com/video/BV... 或 /videos/xxx.mp4"
                     className="w-full px-3 py-2 text-xs font-mono bg-white border border-neutral-300 focus:outline-none focus:border-neutral-900 transition-colors pr-8"
                   />
                   <LinkIcon className="w-3.5 h-3.5 text-neutral-400 absolute right-2.5 top-2.5 pointer-events-none" />
                 </div>
                 <p className="text-[10px] text-neutral-400 font-mono">
-                  支持相对网站根路径（如 /videos/...，文件放入 public 目录即可全网可见）
+                  支持 Bilibili 链接（如 BV号页面或嵌入代码）、YouTube、MP4 直链及相对根路径（/videos/...）
                 </p>
               </div>
 
-              {urlInput.trim() && (
-                <div className="aspect-video bg-black overflow-hidden border border-neutral-300">
-                  <video
-                    src={toRootRelativePath(urlInput.trim()) || urlInput.trim()}
-                    controls
-                    className="w-full h-full object-contain"
-                  />
-                </div>
-              )}
+              {urlInput.trim() && (() => {
+                const sourceInfo = analyzeVideoSource(urlInput.trim());
+                if (sourceInfo?.type === 'bilibili') {
+                  return (
+                    <div className="space-y-1.5">
+                      <div className="aspect-video bg-black overflow-hidden border border-neutral-300 relative">
+                        <iframe
+                          src={sourceInfo.embedUrl}
+                          scrolling="no"
+                          frameBorder="0"
+                          allowFullScreen
+                          referrerPolicy="no-referrer"
+                          className="w-full h-full border-0"
+                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        />
+                      </div>
+                      <div className="flex items-center justify-between text-[10px] font-mono text-neutral-500">
+                        <span className="text-emerald-700 font-medium">✓ 已识别 Bilibili 官方视频播放器</span>
+                        <span>{sourceInfo.bvid ? `BV号: ${sourceInfo.bvid}` : '嵌入播放'}</span>
+                      </div>
+                    </div>
+                  );
+                }
+                if (sourceInfo?.type === 'youtube' || sourceInfo?.type === 'iframe') {
+                  return (
+                    <div className="aspect-video bg-black overflow-hidden border border-neutral-300 relative">
+                      <iframe
+                        src={sourceInfo.embedUrl}
+                        scrolling="no"
+                        frameBorder="0"
+                        allowFullScreen
+                        referrerPolicy="no-referrer"
+                        className="w-full h-full border-0"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                      />
+                    </div>
+                  );
+                }
+                return (
+                  <div className="aspect-video bg-black overflow-hidden border border-neutral-300">
+                    <video
+                      src={toRootRelativePath(urlInput.trim()) || urlInput.trim()}
+                      controls
+                      className="w-full h-full object-contain"
+                    />
+                  </div>
+                );
+              })()}
 
               <button
                 type="submit"

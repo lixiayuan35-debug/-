@@ -15,6 +15,7 @@
 
 import { useState, useEffect } from 'react';
 import { toRootRelativePath } from './pathUtils';
+import { clearLocalUploadedVideos } from './videoStore';
 
 const STORAGE_PREFIX = 'portfolio_img_';
 const INDEX_KEY = 'portfolio_img_keys';
@@ -24,9 +25,35 @@ const EVENT_NAME = 'portfolio_custom_images_updated';
 const IDB_NAME = 'portfolio_image_storage';
 const IDB_STORE = 'images';
 
+/**
+ * Check if an image is a local upload (Base64 data URL or Blob) versus an online/root URL link
+ */
+export function isLocalUploadedImage(val: unknown): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return (
+    val.startsWith('data:image/') ||
+    val.startsWith('data:application/') ||
+    val.startsWith('blob:') ||
+    val.includes(';base64,')
+  );
+}
+
+import persistedLinks from '../data/persistedLinks.json';
+
 // Global memory cache for synchronous instant reads
 const memoryCache = new Map<string, string>();
 let isIdbInitialized = false;
+
+// Preload any links baked into persistedLinks.json
+if (persistedLinks && typeof persistedLinks === 'object' && (persistedLinks as any).images) {
+  Object.entries((persistedLinks as any).images).forEach(([k, v]) => {
+    if (typeof v === 'string' && v.trim() && !isLocalUploadedImage(v)) {
+      const clean = toRootRelativePath(v) || v;
+      memoryCache.set(k, clean);
+      getKeyAliases(k).forEach((alias) => memoryCache.set(alias, clean));
+    }
+  });
+}
 
 export interface CardRatioData {
   aspectRatio?: string;
@@ -93,6 +120,12 @@ export function getKeyAliases(key: string): string[] {
     aliases.add(rawCardId);
   }
 
+  // Avatar aliases
+  if (key === 'persona_custom_avatar' || key === 'personal_curator_avatar') {
+    aliases.add('persona_custom_avatar');
+    aliases.add('personal_curator_avatar');
+  }
+
   return Array.from(aliases);
 }
 
@@ -151,6 +184,8 @@ export function recoverAllStoredImages(): number {
 
   const registerImage = (key: string, dataUrl: string) => {
     if (!key || typeof dataUrl !== 'string' || !dataUrl.trim()) return;
+    // CRITICAL: Do not recover local Base64/blob uploads; keep only web links / root relative paths
+    if (isLocalUploadedImage(dataUrl)) return;
     const cleanUrl = toRootRelativePath(dataUrl) || dataUrl;
     if (!memoryCache.has(key)) {
       memoryCache.set(key, cleanUrl);
@@ -303,6 +338,13 @@ async function initIndexedDB() {
         const k = cursor.key as string;
         const v = cursor.value as string;
         if (k && typeof v === 'string') {
+          if (isLocalUploadedImage(v)) {
+            try {
+              cursor.delete();
+            } catch {}
+            cursor.continue();
+            return;
+          }
           if (!memoryCache.has(k)) {
             memoryCache.set(k, v);
             idbLoadedCount++;
@@ -332,8 +374,218 @@ async function initIndexedDB() {
   }
 }
 
+/**
+ * Automatically load bundled backup from /portfolio-backup.json (in public/) if present.
+ * Allows users to simply drop their exported JSON into public/portfolio-backup.json in VSCode!
+ */
+export async function loadBundledBackupIfPresent(): Promise<boolean> {
+  if (typeof window === 'undefined') return false;
+  try {
+    const res = await fetch('/portfolio-backup.json');
+    if (!res.ok) return false;
+    const data = await res.json();
+    if (!data || typeof data !== 'object') return false;
+
+    let loaded = false;
+
+    if (data.images && typeof data.images === 'object') {
+      Object.entries(data.images).forEach(([key, val]) => {
+        if (typeof val === 'string' && val.trim()) {
+          const clean = toRootRelativePath(val) || val;
+          if (!memoryCache.has(key)) {
+            memoryCache.set(key, clean);
+            loaded = true;
+          }
+          getKeyAliases(key).forEach((alias) => {
+            if (!memoryCache.has(alias)) memoryCache.set(alias, clean);
+          });
+          try {
+            localStorage.setItem(STORAGE_PREFIX + key, clean);
+          } catch {}
+        }
+      });
+    }
+
+    if (data.layouts && typeof data.layouts === 'object') {
+      Object.entries(data.layouts).forEach(([k, v]) => {
+        if (!localStorage.getItem(k)) {
+          localStorage.setItem(k, JSON.stringify(v));
+          loaded = true;
+        }
+      });
+    }
+
+    if (data.ratios && typeof data.ratios === 'object') {
+      Object.entries(data.ratios).forEach(([k, v]) => {
+        if (!localStorage.getItem(k)) {
+          localStorage.setItem(k, JSON.stringify(v));
+          loaded = true;
+        }
+      });
+    }
+
+    if (data.deletedCards && typeof data.deletedCards === 'object') {
+      Object.entries(data.deletedCards).forEach(([k, v]) => {
+        if (!localStorage.getItem(k)) {
+          localStorage.setItem(k, JSON.stringify(v));
+          loaded = true;
+        }
+      });
+    }
+
+    if (loaded) {
+      window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { type: 'bundled_backup_loaded' } }));
+    }
+    return loaded;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Purge ALL locally uploaded images/base64 blobs from the entire application,
+ * while STRICTLY preserving all link-imported images (http, https, and root-relative /works/... paths).
+ */
+export function clearAllLocalBaseImages(keepLinks: boolean = true): number {
+  if (typeof window === 'undefined') return 0;
+  let clearedCount = 0;
+
+  // 1. Purge memoryCache
+  const toDelete: string[] = [];
+  memoryCache.forEach((val, key) => {
+    if (isLocalUploadedImage(val)) {
+      toDelete.push(key);
+    }
+  });
+  toDelete.forEach((k) => {
+    memoryCache.delete(k);
+    clearedCount++;
+  });
+
+  // 2. Purge isolated and legacy localStorage keys
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+
+      // Prefix keys or direct card/project keys
+      if (
+        k.startsWith(STORAGE_PREFIX) ||
+        k.startsWith('card-') ||
+        k.startsWith('project-') ||
+        k.startsWith('hero-') ||
+        k.startsWith('persona_') ||
+        k.startsWith('card_img_') ||
+        k.startsWith('project_cover_')
+      ) {
+        const val = localStorage.getItem(k);
+        if (val && isLocalUploadedImage(val)) {
+          localStorage.removeItem(k);
+          clearedCount++;
+        }
+      }
+
+      // Legacy collections
+      if (
+        k === LEGACY_KEY_V2 ||
+        k === LEGACY_KEY_V1 ||
+        k === 'portfolio_images' ||
+        k === 'custom_images'
+      ) {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === 'object') {
+              let changed = false;
+              Object.entries(parsed).forEach(([subK, subV]) => {
+                if (isLocalUploadedImage(subV)) {
+                  delete parsed[subK];
+                  changed = true;
+                  clearedCount++;
+                }
+              });
+              if (changed) {
+                localStorage.setItem(k, JSON.stringify(parsed));
+              }
+            }
+          }
+        } catch {}
+      }
+
+      // Embedded card images in project_cards_*
+      if (k.startsWith('project_cards_')) {
+        try {
+          const raw = localStorage.getItem(k);
+          if (raw) {
+            const cards = JSON.parse(raw);
+            if (Array.isArray(cards)) {
+              let changed = false;
+              cards.forEach((card) => {
+                if (card && card.imageUrl && isLocalUploadedImage(card.imageUrl)) {
+                  delete card.imageUrl;
+                  changed = true;
+                  clearedCount++;
+                }
+              });
+              if (changed) {
+                localStorage.setItem(k, JSON.stringify(cards));
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.warn('LocalStorage local purge error:', err);
+  }
+
+  // 3. Purge sessionStorage
+  try {
+    for (let i = sessionStorage.length - 1; i >= 0; i--) {
+      const k = sessionStorage.key(i);
+      if (k) {
+        const val = sessionStorage.getItem(k);
+        if (val && isLocalUploadedImage(val)) {
+          sessionStorage.removeItem(k);
+        }
+      }
+    }
+  } catch {}
+
+  // 4. Purge IndexedDB
+  try {
+    openIndexedDB().then((db) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.openCursor();
+      req.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest).result as IDBCursorWithValue;
+        if (cursor) {
+          if (isLocalUploadedImage(cursor.value)) {
+            cursor.delete();
+          }
+          cursor.continue();
+        }
+      };
+    }).catch(() => {});
+  } catch {}
+
+  // 5. Purge local video uploads
+  try {
+    clearLocalUploadedVideos();
+  } catch {}
+
+  // 6. Notify all components to re-render
+  window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { type: 'local_images_cleared' } }));
+
+  return clearedCount;
+}
+
 if (typeof window !== 'undefined') {
+  clearAllLocalBaseImages(true);
   initIndexedDB();
+  loadBundledBackupIfPresent();
 }
 
 /**
@@ -356,7 +608,10 @@ export function getStoredImage(key: string, fallback?: string): string | null {
   for (const k of aliases) {
     if (memoryCache.has(k)) {
       const val = memoryCache.get(k);
-      if (val) return val;
+      if (val) {
+        if (isLocalUploadedImage(val)) return null;
+        return val;
+      }
     }
   }
 
@@ -365,13 +620,17 @@ export function getStoredImage(key: string, fallback?: string): string | null {
     try {
       const direct = localStorage.getItem(STORAGE_PREFIX + k);
       if (direct) {
+        if (isLocalUploadedImage(direct)) {
+          localStorage.removeItem(STORAGE_PREFIX + k);
+          continue;
+        }
         const norm = toRootRelativePath(direct) || direct;
         memoryCache.set(key, norm);
         memoryCache.set(k, norm);
         return norm;
       }
       const rawDirect = localStorage.getItem(k);
-      if (rawDirect && (rawDirect.startsWith('data:') || rawDirect.startsWith('http') || rawDirect.startsWith('/') || rawDirect.startsWith('./') || /^[a-zA-Z]:/.test(rawDirect))) {
+      if (rawDirect && (rawDirect.startsWith('http') || rawDirect.startsWith('/') || rawDirect.startsWith('./'))) {
         const norm = toRootRelativePath(rawDirect) || rawDirect;
         memoryCache.set(key, norm);
         return norm;
@@ -387,7 +646,8 @@ export function getStoredImage(key: string, fallback?: string): string | null {
     if (raw) {
       const parsed = JSON.parse(raw);
       for (const k of aliases) {
-        if (parsed[k]) {
+        if (parsed[k] && typeof parsed[k] === 'string') {
+          if (isLocalUploadedImage(parsed[k])) continue;
           const norm = toRootRelativePath(parsed[k]) || parsed[k];
           memoryCache.set(key, norm);
           memoryCache.set(k, norm);
@@ -404,6 +664,7 @@ export function getStoredImage(key: string, fallback?: string): string | null {
     try {
       const sessionVal = sessionStorage.getItem(STORAGE_PREFIX + k);
       if (sessionVal) {
+        if (isLocalUploadedImage(sessionVal)) continue;
         const norm = toRootRelativePath(sessionVal) || sessionVal;
         memoryCache.set(key, norm);
         return norm;
@@ -413,6 +674,7 @@ export function getStoredImage(key: string, fallback?: string): string | null {
     }
   }
 
+  if (fallback && isLocalUploadedImage(fallback)) return null;
   return toRootRelativePath(fallback) || fallback || null;
 }
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Camera, Image as ImageIcon, AlertCircle } from 'lucide-react';
 import { toRootRelativePath } from '../utils/pathUtils';
+import { isLocalUploadedImage } from '../utils/imageStore';
 
 interface ArtworkVisualProps {
   type: string;
@@ -24,17 +25,16 @@ export const ArtworkVisual: React.FC<ArtworkVisualProps> = ({
   const rawImage =
     imageUrl ||
     (type &&
-    (type.startsWith('data:') ||
-      type.startsWith('http://') ||
+    (type.startsWith('http://') ||
       type.startsWith('https://') ||
       type.startsWith('/') ||
       type.startsWith('./') ||
-      type.includes('/works/') ||
-      /^[a-zA-Z]:/.test(type))
+      type.includes('/works/'))
       ? type
       : null);
 
-  const displayImage = toRootRelativePath(rawImage) || rawImage;
+  const isLocal = isLocalUploadedImage(rawImage) || (rawImage && rawImage.startsWith('blob:'));
+  const displayImage = isLocal ? null : (toRootRelativePath(rawImage) || rawImage);
 
   const [loadFailed, setLoadFailed] = useState<boolean>(false);
   const [prevImage, setPrevImage] = useState<string | null>(displayImage);
@@ -53,6 +53,7 @@ export const ArtworkVisual: React.FC<ArtworkVisualProps> = ({
           key={displayImage.slice(0, 48)}
           src={displayImage}
           alt={alt}
+          referrerPolicy="no-referrer"
           onError={() => {
             console.warn('Image load error occurred for source');
             // If it's a data URL, avoid premature error flash unless truly corrupt

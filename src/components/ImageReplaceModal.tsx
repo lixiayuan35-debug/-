@@ -82,17 +82,23 @@ export const ImageReplaceModal: React.FC<ImageReplaceModalProps> = ({
       setIsProcessing(true);
       setErrorMsg(null);
       await setImage(normalizedUrl);
-      const img = new Image();
-      img.onload = () => {
-        onImageUploaded?.(normalizedUrl, img.naturalWidth || 800, img.naturalHeight || 600);
-      };
-      img.src = normalizedUrl;
+
+      // Attempt to read natural dimensions with no-referrer
+      try {
+        const img = new Image();
+        img.referrerPolicy = 'no-referrer';
+        img.onload = () => {
+          onImageUploaded?.(normalizedUrl, img.naturalWidth || 800, img.naturalHeight || 600);
+        };
+        img.src = normalizedUrl;
+      } catch {}
+
       setSuccessMsg('图片已成功应用！');
       setUrlInput('');
       setTimeout(() => {
         setSuccessMsg(null);
         onClose();
-      }, 900);
+      }, 700);
     } catch (err) {
       console.error(err);
       setErrorMsg('保存图片路径失败，请确认文件路径或链接可直接访问。');
@@ -141,8 +147,11 @@ export const ImageReplaceModal: React.FC<ImageReplaceModalProps> = ({
               <img
                 src={imageUrl}
                 alt="Current Preview"
+                referrerPolicy="no-referrer"
                 className="w-full h-full object-cover"
-                onError={() => setErrorMsg('当前预览图片读取失败，请重新上传')}
+                onError={() => {
+                  console.warn('Preview image load error for:', imageUrl);
+                }}
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-neutral-400 gap-2 text-xs font-mono p-4 text-center">
@@ -251,12 +260,27 @@ export const ImageReplaceModal: React.FC<ImageReplaceModalProps> = ({
                   支持相对网站根路径（如 /works/...，文件放入 public 目录即可全网可见）
                 </p>
               </div>
+
+              {urlInput.trim() && (
+                <div className="relative w-full h-32 bg-neutral-100 border border-neutral-300 overflow-hidden flex items-center justify-center">
+                  <img
+                    src={toRootRelativePath(urlInput.trim()) || urlInput.trim()}
+                    alt="URL Live Preview"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-contain"
+                  />
+                  <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[9px] font-mono px-1.5 py-0.5">
+                    实时效果预览
+                  </div>
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={isProcessing || !urlInput.trim()}
                 className="w-full py-2.5 bg-neutral-900 hover:bg-neutral-800 disabled:opacity-50 text-white text-xs font-mono tracking-wider transition-colors cursor-pointer"
               >
-                {isProcessing ? '正在验证图片...' : '确认应用图片'}
+                {isProcessing ? '正在处理...' : '确认应用图片'}
               </button>
             </form>
           )}

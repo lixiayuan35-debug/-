@@ -1,11 +1,9 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, X, Film, Trash2, Video, Plus, Ratio } from 'lucide-react';
+import { Play, Pause, Volume2, VolumeX, Maximize, Minimize, X, Film, Video } from 'lucide-react';
 import { StaggeredCard } from '../types';
 import { useStoredVideo } from '../utils/videoStore';
 import { toRootRelativePath } from '../utils/pathUtils';
-import { VideoReplaceButton } from './VideoReplaceButton';
-import { VideoUploadModal } from './VideoUploadModal';
-import { CardRatioModal } from './CardRatioModal';
+import { analyzeVideoSource } from '../utils/videoUtils';
 import { getCssAspectRatio, getRatioLabel, parseNumericRatio } from '../utils/ratioUtils';
 
 interface VideoBlockProps {
@@ -14,7 +12,7 @@ interface VideoBlockProps {
   isHovered: boolean;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
-  onDelete: (id: string) => void;
+  onDelete?: (id: string) => void;
   onUpdateCard?: (id: string, updated: Partial<StaggeredCard>) => void;
   customWidth?: string;
   isLocked?: boolean;
@@ -37,12 +35,12 @@ export const VideoBlock: React.FC<VideoBlockProps> = ({
   const [isMuted, setIsMuted] = useState<boolean>(true);
   const [currentTime, setCurrentTime] = useState<number>(0);
   const [duration, setDuration] = useState<number>(0);
-  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
-  const [isRatioModalOpen, setIsRatioModalOpen] = useState<boolean>(false);
   const [controlsVisible, setControlsVisible] = useState<boolean>(false);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   const { videoUrl } = useStoredVideo(`card-video-${card.id}`, card.videoUrl);
+  const videoSource = analyzeVideoSource(videoUrl);
+  const isEmbed = videoSource?.type === 'bilibili' || videoSource?.type === 'youtube' || videoSource?.type === 'iframe';
 
   const togglePlay = (e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -217,20 +215,33 @@ export const VideoBlock: React.FC<VideoBlockProps> = ({
           }
         >
           {videoUrl ? (
-            <>
-              <video
-                ref={videoRef}
-                src={toRootRelativePath(videoUrl) || videoUrl}
-                loop
-                muted={isMuted}
-                playsInline
-                onTimeUpdate={handleTimeUpdate}
-                onLoadedMetadata={handleTimeUpdate}
-                onClick={togglePlay}
-                className={`w-full h-full cursor-pointer transition-all duration-300 ${
-                  isFullscreen ? 'object-contain' : 'object-cover'
-                }`}
-              />
+            isEmbed && videoSource?.embedUrl ? (
+              <div className="w-full h-full relative overflow-hidden bg-black flex items-center justify-center">
+                <iframe
+                  src={videoSource.embedUrl}
+                  scrolling="no"
+                  frameBorder="0"
+                  allowFullScreen
+                  referrerPolicy="no-referrer"
+                  className="w-full h-full border-0 select-none"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                />
+              </div>
+            ) : (
+              <>
+                <video
+                  ref={videoRef}
+                  src={toRootRelativePath(videoUrl) || videoUrl}
+                  loop
+                  muted={isMuted}
+                  playsInline
+                  onTimeUpdate={handleTimeUpdate}
+                  onLoadedMetadata={handleTimeUpdate}
+                  onClick={togglePlay}
+                  className={`w-full h-full cursor-pointer transition-all duration-300 ${
+                    isFullscreen ? 'object-contain' : 'object-cover'
+                  }`}
+                />
 
               {/* Big Center Play Button Overlay (when paused) */}
               {!isPlaying && (
@@ -306,27 +317,19 @@ export const VideoBlock: React.FC<VideoBlockProps> = ({
                 </div>
               </div>
             </>
-          ) : (
-            /* Empty State: Architectural Video Upload Placeholder */
-            <div
-              onClick={() => setIsUploadModalOpen(true)}
-              className="w-full h-full flex flex-col items-center justify-center p-8 bg-neutral-900 border border-dashed border-neutral-700 hover:border-neutral-400 transition-all cursor-pointer group/empty text-center relative overflow-hidden"
-            >
+          )) : (
+            /* Empty State: Architectural Video Placeholder */
+            <div className="w-full h-full flex flex-col items-center justify-center p-8 bg-neutral-900 border border-neutral-800 text-center relative overflow-hidden select-none">
               <div className="absolute inset-0 bg-[radial-gradient(#ffffff0f_1px,transparent_1px)] [background-size:16px_16px] pointer-events-none" />
-
-              <div className="w-12 h-12 rounded-full bg-neutral-800 border border-neutral-600 group-hover/empty:bg-white group-hover/empty:text-neutral-950 text-white flex items-center justify-center transition-all mb-3 z-10">
-                <Video className="w-5 h-5" />
+              <div className="w-12 h-12 rounded-full bg-neutral-800 border border-neutral-700 text-white flex items-center justify-center mb-3 z-10">
+                <Video className="w-5 h-5 text-neutral-400" />
               </div>
-              <span className="text-xs font-mono font-medium text-white block z-10">
-                上传空间实录 / 动态影像体块
+              <span className="text-xs font-mono font-medium text-neutral-300 block z-10">
+                空间实录 · 动态影像体块
               </span>
-              <span className="text-[10px] font-mono text-neutral-400 mt-1 block max-w-xs z-10 leading-relaxed">
-                支持拖拽或选择 MP4、WebM、MOV 视频，与图片并列错落呈现
+              <span className="text-[10px] font-mono text-neutral-500 mt-1 block max-w-xs z-10 leading-relaxed">
+                MOTION & SPATIAL CHRONICLE
               </span>
-              <div className="mt-3 inline-flex items-center gap-1.5 text-[10px] font-mono text-neutral-300 bg-neutral-800/80 hover:bg-neutral-700 px-3 py-1.5 border border-neutral-600 z-10 transition-colors">
-                <Plus className="w-3 h-3" />
-                <span>点击添加本地或在线视频</span>
-              </div>
             </div>
           )}
         </div>
@@ -337,50 +340,6 @@ export const VideoBlock: React.FC<VideoBlockProps> = ({
           <span>0{index + 1} · 视频体块</span>
         </div>
 
-        {/* Quick Actions (Top Right) - Only available in unlocked edit mode */}
-        {!isLocked && (
-          <div
-            className={`absolute top-2 right-2 flex items-center gap-1.5 transition-opacity z-20 ${
-              videoUrl ? 'opacity-0 group-hover:opacity-100' : 'opacity-100'
-            }`}
-          >
-            {/* Custom Ratio Button */}
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                setIsRatioModalOpen(true);
-              }}
-              title={`自定义体块比例 (当前: ${ratioLabel})`}
-              className="px-2 py-1 bg-neutral-900/90 text-white hover:bg-neutral-950 border border-neutral-700 backdrop-blur-xs transition-colors cursor-pointer text-[10px] font-mono flex items-center gap-1"
-            >
-              <Ratio className="w-3 h-3 text-emerald-400" />
-              <span>{ratioLabel}</span>
-            </button>
-
-            <VideoReplaceButton
-              videoKey={`card-video-${card.id}`}
-              title={`上传/更换《${card.title}》视频`}
-              label="更换视频"
-              size="icon"
-              variant="dark"
-            />
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                e.preventDefault();
-                onDelete(card.id);
-              }}
-              title="删去此视频体块"
-              className="p-1.5 bg-neutral-900/90 text-white hover:bg-red-600 border border-neutral-700 backdrop-blur-xs transition-colors cursor-pointer"
-            >
-              <Trash2 className="w-3.5 h-3.5" />
-            </button>
-          </div>
-        )}
-
         {/* Bottom micro coordinate indicator */}
         <div className="absolute bottom-2 right-2 bg-black/70 backdrop-blur-xs text-neutral-400 text-[8px] font-mono px-1.5 py-0.5 z-10 flex items-center gap-1">
           <span>{ratioLabel}</span>
@@ -388,21 +347,6 @@ export const VideoBlock: React.FC<VideoBlockProps> = ({
           <span>VID. {index + 1}</span>
         </div>
       </div>
-
-      <VideoUploadModal
-        isOpen={isUploadModalOpen}
-        onClose={() => setIsUploadModalOpen(false)}
-        videoKey={`card-video-${card.id}`}
-        title={`为《${card.title}》上传视频体块`}
-        defaultFallback={card.videoUrl}
-      />
-
-      <CardRatioModal
-        isOpen={isRatioModalOpen}
-        onClose={() => setIsRatioModalOpen(false)}
-        card={card}
-        onUpdateCard={(updated) => onUpdateCard?.(card.id, updated)}
-      />
     </div>
   );
 };

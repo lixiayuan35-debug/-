@@ -1,12 +1,11 @@
 import React from 'react';
-import { Sparkles, QrCode, Database } from 'lucide-react';
+import { Sparkles, QrCode } from 'lucide-react';
 
 interface HeaderProps {
   onReplayOpening: () => void;
   activeSection: string;
   onNavigate: (sectionId: string) => void;
   onOpenQrModal?: () => void;
-  onOpenBackupModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -14,7 +13,6 @@ export const Header: React.FC<HeaderProps> = ({
   activeSection,
   onNavigate,
   onOpenQrModal,
-  onOpenBackupModal,
 }) => {
   return (
     <header className="fixed top-0 left-0 w-full z-40 bg-[#F5F4F0]/85 backdrop-blur-md border-b border-neutral-300/60 transition-all duration-300">
@@ -57,17 +55,6 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Zone 3: 1-2 primary actions */}
         <div className="flex items-center gap-3">
-          {onOpenBackupModal && (
-            <button
-              onClick={onOpenBackupModal}
-              title="备份与固化您上传的真实作品数据"
-              className="hidden lg:flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono tracking-wider text-neutral-700 bg-neutral-200/60 hover:bg-neutral-900 hover:text-white transition-all duration-300 rounded-none whitespace-nowrap cursor-pointer"
-            >
-              <Database className="w-3 h-3" />
-              <span>数据备份与固化</span>
-            </button>
-          )}
-
           <button
             onClick={onReplayOpening}
             title="重新体验开幕仪式"

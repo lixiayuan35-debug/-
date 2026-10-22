@@ -13,10 +13,21 @@ const EVENT_NAME = 'portfolio_custom_video_updated';
 const IDB_NAME = 'portfolio_video_storage';
 const IDB_STORE = 'videos';
 
+import persistedLinks from '../data/persistedLinks.json';
+
 // In-memory cache for synchronous instant access
 const videoCache = new Map<string, string>();
 const rawBlobs = new Map<string, Blob>();
 let isIdbInitialized = false;
+
+// Preload any video links baked into persistedLinks.json
+if (persistedLinks && typeof persistedLinks === 'object' && (persistedLinks as any).videos) {
+  Object.entries((persistedLinks as any).videos).forEach(([k, v]) => {
+    if (typeof v === 'string' && v.trim() && !v.startsWith('blob:') && !v.startsWith('data:')) {
+      videoCache.set(k, v);
+    }
+  });
+}
 
 // Open or create IndexedDB
 function openIndexedDB(): Promise<IDBDatabase> {
@@ -75,22 +86,69 @@ if (typeof window !== 'undefined') {
   initVideoIndexedDB();
 }
 
+export function isLocalUploadedVideo(val?: string | null): boolean {
+  if (!val || typeof val !== 'string') return false;
+  return val.startsWith('blob:') || val.startsWith('data:');
+}
+
 /**
- * Synchronously get stored video URL (blob URL or external link)
+ * Synchronously get stored video URL (only keeps valid web links / embed URLs / root paths)
  */
 export function getStoredVideo(key: string, fallback?: string): string | null {
   if (videoCache.has(key)) {
     const cached = videoCache.get(key) || null;
+    if (isLocalUploadedVideo(cached)) return null;
     return toRootRelativePath(cached) || cached;
   }
+  if (isLocalUploadedVideo(fallback)) return null;
   return toRootRelativePath(fallback) || fallback || null;
 }
 
 /**
- * Check if a custom video exists for this key
+ * Check if a custom video exists for this key (ignoring purged local blobs)
  */
 export function hasStoredVideo(key: string): boolean {
-  return videoCache.has(key) && Boolean(videoCache.get(key));
+  if (!videoCache.has(key)) return false;
+  const val = videoCache.get(key);
+  if (!val || isLocalUploadedVideo(val)) return false;
+  return true;
+}
+
+/**
+ * Clear all locally uploaded video blobs/files while keeping web/bilibili links
+ */
+export function clearLocalUploadedVideos(): void {
+  rawBlobs.forEach((_, key) => {
+    const url = videoCache.get(key);
+    if (url && url.startsWith('blob:')) {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {}
+    }
+    videoCache.delete(key);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(EVENT_NAME, { detail: { key, videoUrl: null } }));
+    }
+  });
+  rawBlobs.clear();
+
+  // Purge any local blobs in IndexedDB
+  if (typeof window !== 'undefined') {
+    openIndexedDB().then((db) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.openCursor();
+      req.onsuccess = (e) => {
+        const cursor = (e.target as IDBRequest).result as IDBCursorWithValue;
+        if (cursor) {
+          if (typeof cursor.value !== 'string' || isLocalUploadedVideo(cursor.value)) {
+            cursor.delete();
+          }
+          cursor.continue();
+        }
+      };
+    }).catch(() => {});
+  }
 }
 
 /**

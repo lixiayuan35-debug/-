@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { ArtworkVisual } from './ArtworkVisual';
-
 import { getStoredImage } from '../utils/imageStore';
 import { ArrowDown } from 'lucide-react';
 
@@ -52,10 +51,6 @@ export const HeroSection: React.FC<HeroSectionProps> = ({ onExploreClick }) => {
               isHovered={isHovered}
             />
           </div>
-
-
-
-
         </div>
 
         {/* Oversized Typographic Text Layer */}

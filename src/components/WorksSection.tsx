@@ -2,7 +2,6 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Project } from '../types';
 import { PROJECTS_DATA } from '../data/portfolioData';
 import { ArtworkVisual } from './ArtworkVisual';
-import { ImageReplaceButton } from './ImageReplaceButton';
 import { getStoredImage, getProjectDisplayImage } from '../utils/imageStore';
 import { ArrowUpRight, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 
@@ -360,16 +359,6 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                           PREVIEW
                         </span>
                       </div>
-
-                      {/* Replace Photo Button (Camera Icon) on card */}
-                      <div className="absolute bottom-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity z-30">
-                        <ImageReplaceButton
-                          imageKey={`project-${project.id}`}
-                          title={`更换《${project.title}》封面照片`}
-                          size="icon"
-                          variant="dark"
-                        />
-                      </div>
                     </div>
 
                     {/* Connecting Line and Name on the RIGHT of the card */}
@@ -422,21 +411,11 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                 </span>
               </div>
 
-              {/* Title & Tagline & Direct Photo Replacement Button */}
+              {/* Title & Tagline */}
               <div>
-                <div className="flex items-start justify-between gap-4">
-                  <h3 className="text-3xl sm:text-4xl font-serif-display font-normal text-neutral-950 tracking-tight leading-tight">
-                    {activeProject.title}
-                  </h3>
-                  <ImageReplaceButton
-                    imageKey={`project-${activeProject.id}`}
-                    title={`更换《${activeProject.title}》封面照片`}
-                    label="更换照片"
-                    size="sm"
-                    variant="light"
-                    className="shrink-0 mt-1"
-                  />
-                </div>
+                <h3 className="text-3xl sm:text-4xl font-serif-display font-normal text-neutral-950 tracking-tight leading-tight">
+                  {activeProject.title}
+                </h3>
                 <p className="text-xs font-mono tracking-widest text-neutral-500 uppercase mt-1">
                   {activeProject.englishTitle}
                 </p>
@@ -449,8 +428,8 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                   )}
               </div>
 
-              {/* Visual Preview Snapshot with One-Click Replace and Natural Aspect Ratio */}
-              <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-56 bg-neutral-200 border border-neutral-300 overflow-hidden group shadow-xs">
+              {/* Visual Preview Snapshot with Natural Aspect Ratio */}
+              <div className="relative w-full aspect-[16/10] sm:aspect-[16/9] max-h-56 bg-neutral-200 border border-neutral-300 overflow-hidden shadow-xs">
                 <ArtworkVisual
                   key={`preview-visual-${activeProject.id}-${imagesVersion}`}
                   type={activeProject.coverVisual}
@@ -461,18 +440,6 @@ export const WorksSection: React.FC<WorksSectionProps> = ({ onSelectProject }) =
                   className="w-full h-full object-cover"
                   clearBaseVisual={true}
                 />
-                <div className="absolute inset-0 bg-neutral-950/45 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                  <ImageReplaceButton
-                    imageKey={`project-${activeProject.id}`}
-                    title={`更换《${activeProject.title}》封面照片`}
-                    label="点击更换此作品照片"
-                    size="md"
-                    variant="dark"
-                  />
-                </div>
-                <div className="absolute bottom-1.5 left-2 bg-neutral-900/80 text-white text-[9px] font-mono px-1.5 py-0.5 tracking-wider backdrop-blur-xs">
-                  作品主图 · 可替换
-                </div>
               </div>
 
               {/* Chinese Introduction & Design Concept */}

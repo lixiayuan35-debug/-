@@ -1,62 +1,26 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Camera, RefreshCw } from 'lucide-react';
-import { getStoredImage, setStoredImage, removeStoredImage, compressImageFile } from '../utils/imageStore';
+import React, { useState } from 'react';
+import { useStoredImage } from '../utils/imageStore';
 
 interface PersonalAvatarProps {
   className?: string;
 }
 
 export const PersonalAvatar: React.FC<PersonalAvatarProps> = ({ className = '' }) => {
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const { imageUrl: avatarUrl } = useStoredImage('persona_custom_avatar');
   const [imgLoadError, setImgLoadError] = useState<boolean>(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Check storage for any persisted custom uploaded image
-  useEffect(() => {
-    const saved = getStoredImage('persona_custom_avatar');
-    if (saved) {
-      setAvatarUrl(saved);
-      setImgLoadError(false);
-    }
-  }, []);
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      try {
-        const compressed = await compressImageFile(file, 800, 0.85);
-        if (compressed) {
-          setStoredImage('persona_custom_avatar', compressed);
-          setAvatarUrl(compressed);
-          setImgLoadError(false);
-        }
-      } catch (err) {
-        console.error('Avatar upload error:', err);
-      }
-    }
-  };
-
-  const handleResetToDefault = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    removeStoredImage('persona_custom_avatar');
-    setAvatarUrl(null);
-    setImgLoadError(true);
-  };
+  // Synchronously reset error if avatar changes
+  const [prevUrl, setPrevUrl] = useState<string | null>(avatarUrl);
+  if (avatarUrl !== prevUrl) {
+    setPrevUrl(avatarUrl);
+    setImgLoadError(false);
+  }
 
   return (
     <div
-      onClick={() => fileInputRef.current?.click()}
-      className={`relative w-full h-full bg-[#181818] overflow-hidden flex items-center justify-center group select-none ${className}`}
+      className={`relative w-full h-full bg-[#181818] overflow-hidden flex items-center justify-center group select-none cursor-default ${className}`}
       title="Li Xiayuan Profile"
     >
-      {/* Hidden file input for direct photo upload & instant preview */}
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="image/*"
-        onChange={handleFileChange}
-        className="hidden"
-      />
 
       {/* 1. If an image URL is present and hasn't errored out, render the <img> tag */}
       {avatarUrl && !imgLoadError ? (
@@ -266,24 +230,10 @@ export const PersonalAvatar: React.FC<PersonalAvatarProps> = ({ className = '' }
         </div>
       )}
 
-      {/* Subtle hover tone transition */}
-      <div className="absolute inset-0 bg-neutral-950/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
-
-      {/* Corner indicator badge showing "LI XIAYUAN" */}
-      <div className="absolute top-2 left-2 bg-neutral-950/80 backdrop-blur-xs text-white text-[8px] font-mono px-1.5 py-0.5 tracking-wider pointer-events-none">
+      {/* Corner indicator badge showing "5:05 · MONOCHROME" */}
+      <div className="absolute top-2 left-2 bg-neutral-950/80 backdrop-blur-xs text-white text-[8px] font-mono px-1.5 py-0.5 tracking-wider pointer-events-none z-10">
         5:05 · MONOCHROME
       </div>
-
-      {/* Reset button if custom avatar was loaded */}
-      {avatarUrl && avatarUrl !== 'cefbcf1118306a712ac42928250f37d7.jpg' && (
-        <button
-          onClick={handleResetToDefault}
-          className="absolute bottom-2 right-2 bg-white/90 text-neutral-900 p-1 rounded-full shadow hover:bg-neutral-900 hover:text-white transition-colors cursor-pointer z-10"
-          title="重置为默认照片"
-        >
-          <RefreshCw className="w-2.5 h-2.5" />
-        </button>
-      )}
     </div>
   );
 };

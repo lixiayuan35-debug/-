@@ -1,0 +1,9 @@
+{
+  "_comment": "将你在网页中点击【数据备份与固化】导出的 portfolio-backup.json 文件的内容直接复制粘贴覆盖替换本文件，VSCode 本地运行或部署时就会自动全量加载你的所有真实作品与图片！",
+  "version": "1.0",
+  "exportedAt": "",
+  "images": {},
+  "layouts": {},
+  "ratios": {},
+  "deletedCards": {}
+}

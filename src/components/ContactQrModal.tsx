@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Copy, Check, Mail, Phone, ExternalLink } from 'lucide-react';
+import { X, Copy, Check, Mail, Phone } from 'lucide-react';
 import { useStoredImage } from '../utils/imageStore';
 
 interface ContactQrModalProps {
@@ -175,17 +175,22 @@ export const ContactQrModal: React.FC<ContactQrModalProps> = ({ isOpen, onClose 
                     <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">WECHAT QR CODE</span>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
-                  即时沟通
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200">
+                    即时沟通
+                  </span>
+                </div>
               </div>
 
               {/* QR Code Graphic Frame */}
-              <div className="relative my-5 mx-auto p-4 bg-white border border-neutral-200 shadow-inner flex flex-col items-center justify-center">
+              <div
+                className="relative my-5 mx-auto p-4 bg-white border border-neutral-200 shadow-inner flex flex-col items-center justify-center select-none"
+              >
                 {customWechatQr ? (
                   <img
                     src={customWechatQr}
                     alt="微信二维码"
+                    referrerPolicy="no-referrer"
                     className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
                   />
                 ) : (
@@ -219,6 +224,7 @@ export const ContactQrModal: React.FC<ContactQrModalProps> = ({ isOpen, onClose 
                     </div>
                   </div>
                 )}
+
                 <div className="mt-2 text-[11px] font-mono text-neutral-500 tracking-wider">
                   扫一扫上面的二维码图案，加我为朋友
                 </div>
@@ -259,17 +265,22 @@ export const ContactQrModal: React.FC<ContactQrModalProps> = ({ isOpen, onClose 
                     <span className="text-[11px] font-mono text-neutral-500 uppercase tracking-wider">DOUYIN QR CODE</span>
                   </div>
                 </div>
-                <span className="text-[10px] font-mono px-2 py-0.5 bg-neutral-100 text-neutral-700 border border-neutral-200">
-                  视频展讯
-                </span>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-mono px-2 py-0.5 bg-neutral-100 text-neutral-700 border border-neutral-200">
+                    视频展讯
+                  </span>
+                </div>
               </div>
 
               {/* QR Code Graphic Frame */}
-              <div className="relative my-5 mx-auto p-4 bg-white border border-neutral-200 shadow-inner flex flex-col items-center justify-center">
+              <div
+                className="relative my-5 mx-auto p-4 bg-white border border-neutral-200 shadow-inner flex flex-col items-center justify-center select-none"
+              >
                 {customDouyinQr ? (
                   <img
                     src={customDouyinQr}
                     alt="抖音二维码"
+                    referrerPolicy="no-referrer"
                     className="w-48 h-48 sm:w-52 sm:h-52 object-contain"
                   />
                 ) : (
@@ -303,6 +314,7 @@ export const ContactQrModal: React.FC<ContactQrModalProps> = ({ isOpen, onClose 
                     </div>
                   </div>
                 )}
+
                 <div className="mt-2 text-[11px] font-mono text-neutral-500 tracking-wider">
                   打开抖音 App · 扫描二维码关注主页
                 </div>
